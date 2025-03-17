@@ -1,11 +1,20 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "baseUrl": "./",
     "strict": true,
+    "noImplicitAny": false,
+    "types": ["react-native-svg"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "target": "esnext",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "resolveJsonModule": true, 
+    "typeRoots": ["./node_modules/@types", "./node_modules"],
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@graphql/*": ["graphql/*"]
     }
   },
   "include": [
