@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { Provider as PaperProvider, Card, Portal, Dialog, Button } from 'react-native-paper';
+import { Provider as PaperProvider, Card, Portal, Dialog, Button, Menu } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@apollo/client';
@@ -38,9 +38,25 @@ const statusConfig = {
 
 const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) => {
   const { loading, error, data } = useQuery(getEvent, { variables: { _id: event._id } });
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [checkpointDialogVisible, setCheckpointDialogVisible] = useState(false);
 
   const eventImage = event.image && event.image.trim() !== "" ? event.image : null;
   const eventLocation = data?.eventOne?.location || event.location;
+  
+  // Define checkpoint options based on event data
+  const startPoint = data?.eventOne?.startPoint || "จุดเริ่มต้น";
+  const finishPoint = data?.eventOne?.finishPoint || "จุดเส้นชัย";
+  // Filter out duplicate checkpoint options
+  const CHECKPOINT_OPTIONS = [...new Set([startPoint, finishPoint])];
+  
+  // Set default selected location if not already set
+  useEffect(() => {
+    if (!selectedLocation && CHECKPOINT_OPTIONS.length > 0) {
+      setSelectedLocation(CHECKPOINT_OPTIONS[0]);
+    }
+  }, [data]);
 
   const rawLevels = data?.eventOne?.levels || "unknown";
   const eventLevels =
@@ -54,37 +70,97 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
 
   const router = useRouter();
 
-  return (
-    <TouchableOpacity onPress={() => router.push(`/event?id=${event._id}`)}>
-      <Card style={styles.card}>
-        <Card.Content style={styles.cardContent}>
-          <Image
-            source={eventImage ? { uri: eventImage } : require('@/assets/images/parkrun.png')}
-            style={styles.eventImage}
-          />
-          <View style={styles.eventInfo}>
-            <Text style={styles.eventTitle}>{event.name}</Text>
-            <Text style={styles.eventLocation}>
-              <Ionicons name="location-outline" size={16} color="#4DAEB6" /> {eventLocation}
-            </Text>
+  const handleEventPress = () => {
+    setCheckpointDialogVisible(true);
+  };
+  
+  const handleConfirmCheckpoint = () => {
+    setCheckpointDialogVisible(false);
+    router.push(`/event?id=${event._id}&position=${encodeURIComponent(selectedLocation)}`);
+  };
 
-            <View style={styles.statusContainer}>
-              {loading ? (
-                <ActivityIndicator size="small" color="#4DAEB6" />
-              ) : error ? (
-                <Text style={{ color: "red", fontSize: 12 }}>Error loading levels</Text>
-              ) : (
-                <View style={styles.levelContainer}>
-                  <Ionicons name="calendar-outline" size={16} color="#4DAEB6" style={styles.calendarIcon} />
-                  <Text style={[styles.statusText, { color: "#333" }]}>{eventLevels}</Text>
+  return (
+    <>
+      <TouchableOpacity onPress={handleEventPress}>
+        <Card style={styles.card}>
+          <Card.Content style={styles.cardContent}>
+            <Image
+              source={eventImage ? { uri: eventImage } : require('@/assets/images/parkrun.png')}
+              style={styles.eventImage}
+            />
+            <View style={styles.eventInfo}>
+              <Text style={styles.eventTitle}>{event.name}</Text>
+              
+              <View style={styles.locationContainer}>
+                <Ionicons name="location-outline" size={16} color="#4DAEB6" />
+                <View style={styles.locationSelector}>
+                  <Text style={styles.eventLocation}>{selectedLocation || eventLocation}</Text>
                 </View>
-              )}
+              </View>
+
+              <View style={styles.statusContainer}>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#4DAEB6" />
+                ) : error ? (
+                  <Text style={{ color: "red", fontSize: 12 }}>Error loading levels</Text>
+                ) : (
+                  <View style={styles.levelContainer}>
+                    <Ionicons name="calendar-outline" size={16} color="#4DAEB6" style={styles.calendarIcon} />
+                    <Text style={[styles.statusText, { color: "#333" }]}>{eventLevels}</Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-          <Text style={styles.eventDate}>{event.date}</Text>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
+            <Text style={styles.eventDate}>{event.date}</Text>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+      
+      {/* Checkpoint selection dialog */}
+      <Portal>
+        <Dialog
+          visible={checkpointDialogVisible}
+          onDismiss={() => setCheckpointDialogVisible(false)}
+          style={styles.dialogContainer}
+        >
+          <Dialog.Title style={styles.dialogTitle}>เลือกตำแหน่งเช็คอิน</Dialog.Title>
+          <Dialog.Content>
+            {CHECKPOINT_OPTIONS.map((option, index) => (
+              <TouchableOpacity 
+                key={index}
+                style={[styles.positionItem, selectedLocation === option && styles.selectedItem]}
+                onPress={() => setSelectedLocation(option)}
+              >
+                <Ionicons 
+                  name={selectedLocation === option ? "radio-button-on" : "radio-button-off"} 
+                  size={24} 
+                  color="#249781" 
+                />
+                <Text style={styles.positionText}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </Dialog.Content>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button 
+              mode="contained" 
+              onPress={() => setCheckpointDialogVisible(false)} 
+              style={styles.cancelButton}
+              labelStyle={styles.buttonText}
+            >
+              ยกเลิก
+            </Button>
+            <Button 
+              mode="contained" 
+              onPress={handleConfirmCheckpoint} 
+              style={styles.confirmButton}
+              labelStyle={styles.buttonText}
+            >
+              ตกลง
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    </>
   );
 };
 
@@ -321,11 +397,23 @@ const styles = StyleSheet.create({
     color: "#333",
     fontFamily: 'NotoSansThai-Bold',
   },
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  locationSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flex: 1,
+    marginLeft: 4,
+  },
   eventLocation: {
     fontSize: 14,
-    marginTop: 6,
     color: "#666",
     fontFamily: 'NotoSansThai-Regular',
+    marginRight: 4,
   },
   statusContainer: {
     flexDirection: "row",

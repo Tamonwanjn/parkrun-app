@@ -213,58 +213,65 @@ import {
   StyleSheet,
   Image,
   Alert,
-  Dimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons as Icon } from '@expo/vector-icons';
-import { useMutation } from '@apollo/client';
+import { useLazyQuery, useMutation } from '@apollo/client';
 import loginMutation from '@/graphql/mutations/login.js';
-import passwordResetRequestMutation from '@/graphql/mutations/passwordResetRequest.js';
-
-const { height } = Dimensions.get('window');
+import getUserByEmail from '@/graphql/queries/getUserByEmail.js';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [login, { loading }] = useMutation(loginMutation);
-  const [passwordResetRequest] = useMutation(passwordResetRequestMutation);
+
+  const [fetchUser, { loading: fetchingUser }] = useLazyQuery(getUserByEmail);
+  const [login, { loading: loggingIn }] = useMutation(loginMutation);
+
+  // const handleLogin = async () => {
+  //   if (!email || !password) {
+  //     Alert.alert('Error', 'Please enter your email and password.');
+  //     return;
+  //   }
+
+  //   try {
+  //     // 1. ค้นหา _id ของ user จาก email
+  //     const { data } = await fetchUser({ variables: { email } });
+
+  //     if (!data?.userOne?._id) {
+  //       Alert.alert('Error', 'User not found.');
+  //       return;
+  //     }
+
+  //     const userId = data.userOne._id;
+
+  //     // 2. ทำการ login โดยใช้ userId + password
+  //     const { data: loginData } = await login({ variables: { _id: userId, password } });
+
+  //     if (loginData?.login?.token) {
+  //       await AsyncStorage.setItem('authToken', loginData.login.token);
+  //       router.replace('/'); // เปลี่ยนไปหน้าหลักหลังจาก login สำเร็จ
+  //     } else {
+  //       Alert.alert('Error', 'Invalid email or password.');
+  //     }
+  //   } catch (error) {
+  //     console.error('Login error:', error);
+  //     Alert.alert('Error', 'Failed to log in. Please try again.');
+  //   }
+  // };
 
   const handleLogin = async () => {
-    try {
-      const { data } = await login({ variables: { email, password } });
-      console.log('Response:', data);
-  
-      if (data?.signIn?.token) { // เปลี่ยนชื่อจาก login เป็น signIn
-        await AsyncStorage.setItem('userToken', data.signIn.token);
-        router.replace('/');
-      } else {
-        Alert.alert('Login Failed', 'Invalid email or password.');
-      }
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Login Error', 'Something went wrong, please try again');
-    }
-   
-  };
-  
-  const handlePasswordReset = async () => {
-    if (!email) {
-      Alert.alert('Enter Email', 'Please enter your email to reset your password');
-      return;
-    }
-
-    try {
-      await passwordResetRequest({ variables: { email } });
-      Alert.alert('Password Reset', 'A password reset link has been sent to your email');
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Error', 'Failed to send reset link. Please try again.');
-    }
-  };
+        await AsyncStorage.removeItem("userToken");
+        if (email === 'admin' && password === '123456') {
+          const token = '123456abcdef';
+          await AsyncStorage.setItem('userToken', token);
+          router.replace('/');
+        } else {
+          Alert.alert('Login Failed', 'Invalid email or password');
+        }
+      };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -294,22 +301,17 @@ export default function LoginScreen() {
             secureTextEntry={!showPassword}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Icon
-              name={showPassword ? 'eye' : 'eye-off'}
-              size={24}
-              color="#666"
-            />
+            <Icon name={showPassword ? 'eye' : 'eye-off'} size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.loginButtonText}>{loading ? 'Logging in...' : 'Login'}</Text>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={fetchingUser || loggingIn}>
+          <Text style={styles.loginButtonText}>{(fetchingUser || loggingIn) ? 'Logging in...' : 'Login'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.resetpassword} onPress={() => router.push('/resetpassword')}>
           <Text style={styles.resetpasswordText}>ลืมรหัสผ่าน?</Text>
         </TouchableOpacity>
-
       </View>
     </SafeAreaView>
   );

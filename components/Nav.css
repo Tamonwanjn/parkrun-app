@@ -1,0 +1,37 @@
+
+.grow{
+    
+    font-size:20;
+}
+@media screen and (max-width: 1024px) {
+	.navbarnone {
+    	display: none !important;
+    }
+	
+}
+
+@media screen and (max-width: 320px) {
+    .menuText{
+        margin-left: 80px !important;
+        margin-top: -40px !important; 
+        font-size: 18px !important;
+    }
+    .iconmenu{
+        height: 40px !important; 
+        margin-top: -150px !important; 
+        margin-right: -400px !important;
+        color: black !important;
+    }    
+}
+
+/* .navbar2{
+    justify-content: 'flex-start';
+    display: 'flex';
+    align-items: 'center';
+} */
+.navbar-header{
+    position: absolute;
+    width:  100%;
+    height: auto;
+    z-index: 1000;
+}

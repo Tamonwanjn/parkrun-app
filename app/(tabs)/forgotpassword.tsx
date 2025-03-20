@@ -59,14 +59,14 @@ export default function ForgotPasswordScreen() {
         />
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, { marginTop: 10 }]} 
           placeholder="Confirm Password"
           secureTextEntry
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
 
-        <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword} disabled={loading}>
+        <TouchableOpacity style={[styles.resetButton, { marginTop: 50 }]}  onPress={handleResetPassword} disabled={loading}>
           <Text style={styles.resetButtonText}>{loading ? 'Resetting...' : 'Reset Password'}</Text>
         </TouchableOpacity>
       </View>
