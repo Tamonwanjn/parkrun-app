@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Platform, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Surface, Portal, Dialog } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { Camera, CameraView } from "expo-camera";
@@ -10,6 +10,8 @@ import { useQuery } from "@apollo/client";
 import getEvent from "@/graphql/queries/getEventOne";
 import races from "@/graphql/queries/races";
 import getRunnersByEvent from "@/graphql/queries/getRunnersByEvent";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface Runner {
   _id: string;
@@ -29,127 +31,12 @@ const THEME_COLORS = {
   white: "#FFFFFF",
 };
 
-function QrScanner({ setIsScanning }: { setIsScanning: React.Dispatch<React.SetStateAction<boolean>> }) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanned, setScanned] = useState(false);
-  const [qrImageUri, setQrImageUri] = useState<string | null>(null);
-  const [torchOn, setTorchOn] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === "granted");
-    })();
-  }, []);
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("สิทธิ์ถูกปฏิเสธ", "กรุณาอนุญาตให้แอปเข้าถึงคลังภาพ");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Fixed: Use the proper enum
-      allowsEditing: false,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setQrImageUri(result.assets[0].uri);
-      // ทำการประมวลผล QR code จากรูปภาพที่เลือก
-      Alert.alert(
-        "สแกนสำเร็จ",
-        "บันทึกการเข้างานเรียบร้อยแล้ว",
-        [
-          {
-            text: "ตกลง",
-            onPress: () => {
-              setIsScanning(false);
-            }
-          }
-        ]
-      );
-    }
-  };
-
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-    if (scanned) return;
-    setScanned(true);
-    Alert.alert(
-      "สแกนสำเร็จ",
-      "บันทึกการเข้างานเรียบร้อยแล้ว",
-      [
-        {
-          text: "ตกลง",
-          onPress: () => {
-            setIsScanning(false);
-          }
-        }
-      ]
-    );
-  };
-
-  if (hasPermission === null) {
-    return <Text>Requesting camera permission...</Text>;
-  }
-
-  if (hasPermission === false) {
-    return (
-      <View style={styles.container}>
-        <Text>ไม่สามารถใช้กล้องได้ กรุณาให้สิทธิ์</Text>
-        <Button
-          onPress={async () => {
-            const { status } = await Camera.requestCameraPermissionsAsync();
-            setHasPermission(status === "granted");
-          }}
-        >
-          Allow Camera
-        </Button>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      <CameraView
-        style={{ flex: 1 }}
-        facing="back"
-        onBarcodeScanned={handleBarCodeScanned}
-        enableTorch={torchOn}
-      />
-
-      {/* กรอบสแกน */}
-      <View style={styles.scanFrame}>
-        <View style={styles.scanLine} />
-      </View>
-
-      {/* ปุ่ม STOP SCAN แทนกากบาท */}
-      <TouchableOpacity style={styles.stopScanButton} onPress={() => setIsScanning(false)}>
-        <Ionicons name="stop-circle" size={24} color="#fff" />
-        <Text style={styles.stopScanText}>Stop Scan</Text>
-      </TouchableOpacity>
-
-      {/* ปุ่มด้านล่าง */}
-      <View style={styles.bottomScanButtons}>
-        <TouchableOpacity style={styles.scanActionButton} onPress={() => setTorchOn(!torchOn)}>
-          <Ionicons name={torchOn ? "flash" : "flash-outline"} size={24} color="#fff" />
-          <Text style={styles.scanActionText}>เปิดไฟฉาย</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.scanActionButton} onPress={pickImage}>
-          <Ionicons name="images-outline" size={24} color="#fff" />
-          <Text style={styles.scanActionText}>เลือกรูป QR</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 // Main Event Component
 export default function Event() {
   const { id, position, date } = useLocalSearchParams();
   const eventDate = Array.isArray(date) ? date[0] : date;
+  const [scannedRunners, setScannedRunners] = useState<Runner[]>([]);
+  const router = useRouter();
 
   // GraphQL query
   const { loading, error, data } = useQuery(getEvent, {
@@ -186,6 +73,8 @@ export default function Event() {
   const eventStatus = event?.status || "ไม่ระบุ";
   const startTime = race?.startTime ? new Date(race.startTime).toLocaleString('th-TH') : "ไม่ระบุ";
   const runners = runnerData?.runners || [];
+  const combinedRunners = [...runners, ...scannedRunners];
+  const [checkedInCount, setCheckedInCount] = useState(0);
 
   // Add eventLevels formatting similar to index.tsx
   const rawLevels = event?.levels || "ไม่ระบุ";
@@ -197,15 +86,6 @@ export default function Event() {
         : rawLevels === "once"
           ? "จัดเดือนละ 1 ครั้ง (จัดวันเสาร์แรก)"
           : "ไม่ระบุ";
-
-  // Loading and error states
-  if (loading || raceLoading) return <Text style={styles.loadingText}>กำลังโหลด...</Text>;
-  if (error || raceError) return <Text style={styles.errorText}>เกิดข้อผิดพลาด</Text>;
-
-  // Show QR scanner if scanning is active
-  if (isScanning) {
-    return <QrScanner setIsScanning={setIsScanning} />;
-  }
 
   // Animation functions
   const handlePressIn = () => {
@@ -222,6 +102,41 @@ export default function Event() {
     }).start();
   };
 
+  // อันนี้คือ set ให้สแกนหลัง 10 โมงไม่ได้ 
+  // const handleScanPress = () => {
+  //   if (!race?.startTime) {
+  //     Alert.alert("ไม่สามารถสแกนร่วมงานได้", "ไม่พบข้อมูลเวลาเริ่มงาน");
+  //     return;
+  //   }
+
+  //   const startDate = new Date(race.startTime);
+  //   const oneHourBefore = new Date(startDate);
+  //   oneHourBefore.setHours(startDate.getHours() - 1); // 1 ชั่วโมงก่อนเวลาเริ่ม
+
+  //   const cutoffTime = new Date(startDate);
+  //   cutoffTime.setHours(10, 0, 0); // ตั้งเวลาปิดรับสแกนเป็น 10:00 น.
+
+  //   const now = new Date();
+
+  //   if (now < oneHourBefore) {
+  //     Alert.alert(
+  //       "ไม่สามารถสแกนได้",
+  //       `สามารถสแกนได้ 1 ชั่วโมงก่อนเวลาเริ่มงาน (${oneHourBefore.toLocaleTimeString('th-TH')})`
+  //     );
+  //     return;
+  //   }
+
+  //   if (now > cutoffTime) {
+  //     Alert.alert(
+  //       "ไม่สามารถสแกนได้",
+  //       "ขณะนี้เลยเวลาสแกนเข้าร่วมงานแล้ว (หลัง 10:00 น.)"
+  //     );
+  //     return;
+  //   }
+
+  //   router.push(`/scanner?id=${id}&position=${selectedLocation}&date=${eventDate}`);
+  // };
+
   const renderInfoItem = (icon: string, label: string, value: string | number) => (
     <View style={styles.infoRow}>
       <View style={styles.infoItem}>
@@ -234,14 +149,73 @@ export default function Event() {
     </View>
   );
 
-  const renderRunnerCard = (runner) => (
-    <Surface key={runner._id} style={styles.runnerCard}>
-      <Text style={styles.runnerText}>
-        <Text style={styles.runnerNumber}>#{runner.user.bib}</Text> {runner.user.name}
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+  const renderRunnerCard = (runner: Runner, index: number) => (
+    <Surface 
+      key={runner._id} 
+      style={[
+        styles.runnerCard, 
+        { backgroundColor: index % 2 === 0 ? '#FFFFFF' : '#80CFC0' }
+      ]}
+    >
+      <Text style={[
+        styles.runnerText,
+        { color: index % 2 === 0 ? THEME_COLORS.text : '#FFFFFF' }
+      ]}>
+        <Text style={[
+          styles.runnerNumber,
+          { color: index % 2 === 0 ? THEME_COLORS.text : '#FFFFFF' }
+        ]}>#{combinedRunners.length - index}</Text> {runner.user.name}
       </Text>
-      <Text style={styles.timeText}>{runner.time || "ยังไม่มีเวลา"}</Text>
+      <Text style={[
+        styles.timeText,
+        { color: index % 2 === 0 ? THEME_COLORS.primary : '#FFFFFF' }
+      ]}>
+        {runner.time ? formatTime(runner.time) : "ยังไม่มีเวลา"}
+      </Text>
     </Surface>
   );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchScannedRunners = async () => {
+        try {
+          const stored = await AsyncStorage.getItem(`runnerList_${id}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const formatted: Runner[] = parsed.map((item: any) => ({
+              _id: item.runnerId,
+              user: {
+                bib: item.bib,
+                name: item.name
+              },
+              time: item.time
+            }));
+            setScannedRunners(formatted);
+            setCheckedInCount(parsed.length); // Update counter
+          } else {
+            setCheckedInCount(0); // Reset counter if no data
+          }
+        } catch (error) {
+          console.error('ไม่สามารถโหลดข้อมูลจาก AsyncStorage', error);
+          setCheckedInCount(0);
+        }
+      };
+
+      fetchScannedRunners();
+    }, [id])
+  );
+
+  if (loading || raceLoading) return <Text style={styles.loadingText}>กำลังโหลด...</Text>;
+  if (error || raceError) return <Text style={styles.errorText}>เกิดข้อผิดพลาด</Text>;
 
   return (
     <>
@@ -260,27 +234,40 @@ export default function Event() {
               <Text style={styles.approvedText}>{eventLevels}</Text>
             </View>
           </View>
+
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={24} color="#00A572" />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>วันที่และเวลาเริ่มงาน</Text>
-              <Text style={styles.infoValue}>{startTime}</Text>
+              <Text style={styles.infoValue}>{startTime} น.</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="people-outline" size={24} color="#00A572" />
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoLabel}>จำนวนผู้เช็คอิน</Text>
+              <Text style={styles.infoValue}>{checkedInCount} คน</Text>
             </View>
           </View>
         </Surface>
 
-        <Surface style={styles.infoBox}>
-          <Text style={styles.infoLabel}>รายชื่อนักวิ่งที่เข้าร่วม</Text>
-          {runnerLoading ? (
-            <Text style={styles.loadingText}>กำลังโหลดข้อมูลนักวิ่ง...</Text>
-          ) : runners.length > 0 ? (
-            runners.map(renderRunnerCard)
-          ) : (
-            <Text style={styles.errorText}>ไม่มีผู้เข้าร่วม</Text>
-          )}
-        </Surface>
+        <Surface style={styles.runnerListBox}>
+  <Text style={[styles.infoLabel, { fontSize: 18, fontWeight: "bold", marginBottom: 8 }]}>
+    รายชื่อนักวิ่งที่เข้าร่วม
+  </Text>
+
+  {runnerLoading ? (
+    <Text style={styles.loadingText}>กำลังโหลดข้อมูลนักวิ่ง...</Text>
+  ) : combinedRunners.length > 0 ? (
+    combinedRunners.map(renderRunnerCard)
+  ) : (
+    <Text style={styles.errorText}>ไม่มีผู้เข้าร่วม</Text>
+  )}
+</Surface>
+
       </ScrollView>
-      
+
       {/* Bottom bar with scan button */}
       <Surface style={styles.bottomBar}>
         <View style={styles.dropdownContainer}>
@@ -294,20 +281,32 @@ export default function Event() {
           </Button>
         </View>
 
-        {/* ปุ่มสแกน QR code */}
+        {/* ปุ่มสแกน QR code แบบธรรมดา*/}
         <TouchableOpacity
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={0.8}
-          onPress={() => setIsScanning(true)}
+          onPress={() => router.push(`/scanner?id=${id}&position=${selectedLocation}&date=${eventDate}`)}
         >
           <Animated.View style={[styles.scanButton, { transform: [{ scale: scaleAnim }] }]}>
             <Ionicons name="qr-code" size={24} color={THEME_COLORS.white} />
             <Text style={styles.buttonText}>สแกน</Text>
           </Animated.View>
         </TouchableOpacity>
+        {/* ปุ่มสแกน QR code แบบห้ามสแกนหลัง10โมง*/}
+        {/* <TouchableOpacity
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={0.8}
+          onPress={handleScanPress}
+        >
+          <Animated.View style={[styles.scanButton, { transform: [{ scale: scaleAnim }] }]}>
+            <Ionicons name="qr-code" size={24} color={THEME_COLORS.white} />
+            <Text style={styles.buttonText}>สแกน</Text>
+          </Animated.View>
+        </TouchableOpacity> */}
       </Surface>
-      
+
       {/* Checkpoint selection dialog */}
       <Portal>
         <Dialog
@@ -318,35 +317,35 @@ export default function Event() {
           <Dialog.Title style={styles.dialogTitle}>เปลี่ยนตำแหน่งจุดเช็คอิน</Dialog.Title>
           <Dialog.Content>
             {CHECKPOINT_OPTIONS.map((option, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 style={[styles.positionItem, selectedLocation === option && styles.selectedItem]}
                 onPress={() => setSelectedLocation(option)}
               >
-                <Ionicons 
-                  name={selectedLocation === option ? "radio-button-on" : "radio-button-off"} 
-                  size={24} 
-                  color="#249781" 
+                <Ionicons
+                  name={selectedLocation === option ? "radio-button-on" : "radio-button-off"}
+                  size={24}
+                  color="#249781"
                 />
                 <Text style={styles.positionText}>{option}</Text>
               </TouchableOpacity>
             ))}
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
-            <Button 
-              mode="contained" 
-              onPress={() => setDialogVisible(false)} 
+            <Button
+              mode="contained"
+              onPress={() => setDialogVisible(false)}
               style={styles.cancelButton}
               labelStyle={styles.buttonText}
             >
               ยกเลิก
             </Button>
-            <Button 
-              mode="contained" 
+            <Button
+              mode="contained"
               onPress={() => {
                 setSelectedLocation(selectedLocation);
                 setDialogVisible(false);
-              }} 
+              }}
               style={styles.confirmButton}
               labelStyle={styles.buttonText}
             >
@@ -372,6 +371,7 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
     marginBottom: 16,
+    fontFamily: 'NotoSansThai-Regular',
   },
   dialogActions: {
     flexDirection: "row",
@@ -395,6 +395,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 12,
+    fontFamily: 'NotoSansThai-Regular',
   },
   cancelButton: {
     flex: 1,
@@ -414,17 +415,20 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 100,
+    flexGrow: 1, 
   },
   loadingText: {
     textAlign: 'center',
     padding: 20,
     fontSize: 16,
+    fontFamily: 'NotoSansThai-Regular',
   },
   errorText: {
     textAlign: 'center',
     padding: 20,
     color: 'red',
     fontSize: 16,
+    fontFamily: 'NotoSansThai-Regular',
   },
   infoBox: {
     backgroundColor: THEME_COLORS.secondary,
@@ -432,17 +436,18 @@ const styles = StyleSheet.create({
     padding: 16,
     margin: 16,
     elevation: 1,
+    marginBottom: 5,
   },
   infoRowWithBadge: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 15,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 10,
   },
   infoItem: {
     flexDirection: "row",
@@ -454,11 +459,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: THEME_COLORS.textSecondary,
     fontSize: 14,
+    fontFamily: 'NotoSansThai-Regular',
   },
   infoValue: {
     color: THEME_COLORS.text,
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: 'NotoSansThai-Regular',
   },
   approvedBadge: {
     backgroundColor: `${THEME_COLORS.success}20`,
@@ -470,15 +477,28 @@ const styles = StyleSheet.create({
     color: THEME_COLORS.success,
     fontSize: 14,
     fontWeight: "500",
+    fontFamily: 'NotoSansThai-Regular',
   },
   runnersList: {
     paddingHorizontal: 16,
   },
-  runnerCard: {
-    backgroundColor: THEME_COLORS.white,
+  runnerListBox: {
+    backgroundColor: THEME_COLORS.secondary,
     borderRadius: 12,
     padding: 16,
+    margin: 16,
+    elevation: 1,
+    marginBottom: 5,
+    flex: 1, 
+    minHeight: 300, 
+  },
+  runnerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginBottom: 8,
+    marginTop: 5,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -487,14 +507,17 @@ const styles = StyleSheet.create({
   runnerText: {
     fontSize: 16,
     color: THEME_COLORS.text,
+    fontFamily: 'NotoSansThai-Regular',
   },
   runnerNumber: {
     fontWeight: "600",
+    fontFamily: 'NotoSansThai-Regular',
   },
   timeText: {
     fontSize: 16,
     fontWeight: "600",
     color: THEME_COLORS.primary,
+    fontFamily: 'NotoSansThai-Regular',
   },
   bottomBar: {
     position: "absolute",
@@ -505,25 +528,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 16,
     paddingBottom: Platform.OS === "ios" ? 32 : 16,
-    gap: 16,  // Increased gap between elements
+    gap: 16,
     elevation: 8,
-    justifyContent: "space-between", // Ensure proper spacing between elements
-    alignItems: "center", // Center items vertically
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   dropdownContainer: {
     flex: 1,
-    marginRight: 8, // Add margin to ensure separation
+    marginRight: 8,
   },
   dropdownButton: {
     borderColor: THEME_COLORS.primary,
     borderWidth: 1,
-    maxWidth: "100%", // Ensure button doesn't overflow
+    maxWidth: "100%",
   },
   dropdownButtonContent: {
     height: 48,
   },
   scanButton: {
-    backgroundColor: THEME_COLORS.primary,
+    backgroundColor: '#249781',
     borderRadius: 12,
     padding: 12,
     paddingHorizontal: 24,
@@ -536,86 +559,6 @@ const styles = StyleSheet.create({
     color: THEME_COLORS.white,
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: 'NotoSansThai-Regular',
   },
-  closeScannerBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-  },
-  scanFrame: {
-    position: "absolute",
-    top: "40%",
-    left: "10%",
-    width: "80%",
-    height: 300,
-    borderColor: "#4DAEB6",
-    borderWidth: 2,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    transform: [{ translateY: -150 }],
-  },
-  scanLine: {
-    width: "90%",
-    height: 2,
-    backgroundColor: "#4DAEB6",
-    position: "absolute",
-  },
-  stopScanButton: {
-    position: "absolute",
-    bottom: 120,
-    alignSelf: "center",
-    backgroundColor: "#D32F2F",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    elevation: 2,
-  },
-  stopScanText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  zoomButtons: {
-    position: "absolute",
-    bottom: 120,
-    alignSelf: "center",
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 20,
-    padding: 5,
-  },
-  zoomButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  zoomButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  bottomScanButtons: {
-    position: "absolute",
-    bottom: 60, 
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 20,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    marginHorizontal: 10, 
-  },
-  scanActionButton: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scanActionText: {
-    color: "#FFFFFF",
-    marginTop: 5,
-    fontSize: 14,
-  }
 });

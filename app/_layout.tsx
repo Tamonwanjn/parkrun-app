@@ -339,6 +339,7 @@ import { Provider as PaperProvider } from "react-native-paper";
 import { ApolloProvider } from "@apollo/client";
 import client from "@/graphql/client";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -417,3 +418,106 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 });
+
+
+
+
+// *******************************************************************************************
+
+
+// import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+// import { useFonts } from "expo-font";
+// import { Stack, useRouter } from "expo-router";
+// import * as SplashScreen from "expo-splash-screen";
+// import { useEffect, useCallback } from "react";
+// import "react-native-reanimated";
+// import { ActivityIndicator, View, StyleSheet, Text } from "react-native";
+// import { Provider as PaperProvider } from "react-native-paper";
+// import { ApolloProvider } from "@apollo/client";
+// import client from "@/graphql/client";
+// import { useColorScheme } from "@/hooks/useColorScheme";
+// import { AuthProvider, useAuth } from "@/context/AuthContext"; 
+// import { useSegments } from "expo-router";
+
+// SplashScreen.preventAutoHideAsync();
+
+// function LayoutContent() {
+//   const { user, loading } = useAuth();
+//   const router = useRouter();
+
+//   const [fontsLoaded] = useFonts({
+//     "NotoSansThai-Regular": require("@/assets/fonts/NotoSansThai-Regular.ttf"),
+//     "NotoSansThai-Bold": require("@/assets/fonts/NotoSansThai-Bold.ttf"),
+//   });
+
+//   const isAppReady = fontsLoaded && !loading;
+//   const segments = useSegments();
+
+//   useEffect(() => {
+//     if (isAppReady) {
+//       SplashScreen.hideAsync();
+  
+//       const inLogin = segments[0] === "login";
+  
+//       if (!user && !inLogin) {
+//         router.replace("/login");
+//       } else if (user && inLogin) {
+//         router.replace("/");
+//       }
+//     }
+//   }, [isAppReady, user, segments]);
+
+//   const onLayoutRootView = useCallback(async () => {
+//     if (isAppReady) {
+//       await SplashScreen.hideAsync();
+//     }
+//   }, [isAppReady]);
+
+//   if (!isAppReady) {
+//     return (
+//       <View style={styles.loadingContainer} onLayout={onLayoutRootView}>
+//         <ActivityIndicator size="large" />
+//         <Text style={styles.text}>Loading...</Text>
+//       </View>
+//     );
+//   }
+
+//   return (
+//     <Stack>
+//       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+//       <Stack.Screen name="login" options={{ headerShown: false }} />
+//     </Stack>
+//   );
+// }
+
+// export default function RootLayout() {
+//   const colorScheme = useColorScheme();
+
+//   return (
+//     <ApolloProvider client={client}>
+//       <PaperProvider>
+//         <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+//           <AuthProvider> {/* ✅ ครอบด้วย AuthProvider */}
+//             <LayoutContent />
+//           </AuthProvider>
+//         </ThemeProvider>
+//       </PaperProvider>
+//     </ApolloProvider>
+//   );
+// }
+
+// const styles = StyleSheet.create({
+//   container: {
+//     flex: 1,
+//   },
+//   loadingContainer: {
+//     flex: 1,
+//     justifyContent: "center",
+//     alignItems: "center",
+//   },
+//   text: {
+//     fontFamily: "NotoSansThai-Regular",
+//     fontSize: 16,
+//     color: "#333",
+//   },
+// });

@@ -10,11 +10,12 @@
     "target": "esnext",
     "moduleResolution": "node",
     "skipLibCheck": true,
-    "resolveJsonModule": true, 
+    "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types", "./node_modules"],
     "paths": {
       "@/*": ["./*"],
-      "@graphql/*": ["graphql/*"]
+      "@graphql/*": ["graphql/*"],
+      "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
     }
   },
   "include": [

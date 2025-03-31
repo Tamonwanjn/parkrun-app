@@ -7,201 +7,171 @@
 //   TouchableOpacity,
 //   StyleSheet,
 //   Image,
-//   Pressable,
 //   Alert,
-//   ScrollView,
-//   Dimensions,
-//   Platform,
 // } from 'react-native';
-// import { StatusBar } from 'expo-status-bar';
 // import { useRouter } from 'expo-router';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { Ionicons as Icon } from '@expo/vector-icons';
-// import getUserOne from "@/graphql/queries/getUserOne";
-// import getUserByEmail from '@/graphql/queries/getUserByEmail';
-// import { useLazyQuery } from '@apollo/client';
-// import api from '@graphql/api';
-
-// // รับค่าความสูงของหน้าจอ
-// const { height } = Dimensions.get('window');
-
+// import { useLazyQuery, useMutation } from '@apollo/client';
+// import loginMutation from '@/graphql/mutations/login.js';
+// import getUserByEmail from '@/graphql/queries/getUserByEmail.js';
+// import { signInWithEmailAndPassword } from 'firebase/auth';
+// import { auth } from '@/config/firebaseConfig';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // export default function LoginScreen() {
 //   const router = useRouter();
 //   const [email, setEmail] = useState('');
 //   const [password, setPassword] = useState('');
 //   const [showPassword, setShowPassword] = useState(false);
-//   const [getUser, { data, loading, error }] = useLazyQuery(getUserByEmail);
 
+//   const [fetchUser, { loading: fetchingUser }] = useLazyQuery(getUserByEmail);
+//   const [login, { loading: loggingIn }] = useMutation(loginMutation);
 
 //   const handleLogin = async () => {
-//     await AsyncStorage.removeItem("userToken");
-//     if (email === 'admin' && password === '123456') {
-//       const token = '123456abcdef';
+//     if (!email || !password) {
+//       Alert.alert('Error', 'กรุณากรอกอีเมลและรหัสผ่าน');
+//       return;
+//     }
+
+//     try {
+//       // ✅ Firebase login
+//       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+//       const user = userCredential.user;
+
+//       // ✅ เก็บ token ลง AsyncStorage (optional)
+//       const token = await user.getIdToken();
 //       await AsyncStorage.setItem('userToken', token);
+
+//       Alert.alert('Success', 'ล็อกอินสำเร็จ');
 //       router.replace('/');
-//     } else {
-//       Alert.alert('Login Failed', 'Invalid email or password');
+//     } catch (error: any) {
+//       if (error.code === 'auth/user-not-found') {
+//         Alert.alert('Error', 'ไม่มีอีเมลนี้ในระบบ');
+//       } else if (error.code === 'auth/wrong-password') {
+//         Alert.alert('Error', 'รหัสผ่านไม่ถูกต้อง');
+//       } else if (error.code === 'auth/network-request-failed') {
+//         Alert.alert('Error', 'โปรดตรวจสอบอินเทอร์เน็ตของท่าน');
+//       } else {
+//         Alert.alert('Error', error.message);
+//       }
 //     }
 //   };
 
 //   return (
-//     <View style={styles.container}>
-//       <StatusBar style="dark" />
-      
-//       <ScrollView 
-//         contentContainerStyle={{ height: height }} 
-//         keyboardShouldPersistTaps="always"
-//         scrollEnabled={false}
-//       >
-//         <SafeAreaView style={styles.safeArea}>
-//           {/* Logo Section */}
-//           <View style={styles.logoContainer}>
-//             <Image
-//               source={require("../assets/images/parkrunlogo.png")}
-//               style={styles.logo}
-//               resizeMode="contain"
-//             />
-//           </View>
+//     <SafeAreaView style={styles.container}>
+//       <View style={styles.logoContainer}>
+//         <Image
+//           source={require('../assets/images/parkrunlogo.png')}
+//           style={styles.logo}
+//           resizeMode="contain"
+//         />
+//       </View>
 
-//           {/* Login Form */}
-//           <View style={styles.formContainer}>
-//             <TextInput
-//               style={styles.input}
-//               placeholder="Enter your email"
-//               value={email}
-//               onChangeText={setEmail}
-//               keyboardType="email-address"
-//               autoCapitalize="none"
-//             />
-//             <View style={styles.passwordContainer}>
-//               <TextInput
-//                 style={styles.passwordInput}
-//                 placeholder="Enter your password"
-//                 value={password}
-//                 onChangeText={setPassword}
-//                 secureTextEntry={!showPassword}
-//               />
-//               <TouchableOpacity
-//                 onPress={() => setShowPassword(!showPassword)}
-//                 style={styles.eyeIcon}
-//               >
-//                 <Icon name={showPassword ? "eye" : "eye-off"} size={24} color="#666" />
-//               </TouchableOpacity>
-//             </View>
+//       <View style={styles.formContainer}>
+//         <TextInput
+//           style={styles.input}
+//           placeholder="Enter your email"
+//           value={email}
+//           onChangeText={setEmail}
+//           keyboardType="email-address"
+//           autoCapitalize="none"
+//         />
 
-//             <TouchableOpacity style={styles.resetpassword}>
-//               <Text style={styles.resetpasswordText}>Forgot Password?</Text>
-//             </TouchableOpacity>
+//         <View style={styles.passwordContainer}>
+//           <TextInput
+//             style={styles.passwordInput}
+//             placeholder="Enter your password"
+//             value={password}
+//             onChangeText={setPassword}
+//             secureTextEntry={!showPassword}
+//           />
+//           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+//             <Icon name={showPassword ? 'eye' : 'eye-off'} size={24} color="#666" />
+//           </TouchableOpacity>
+//         </View>
 
-//             <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-//               <Text style={styles.loginButtonText}>Login</Text>
-//             </TouchableOpacity>
-//           </View>
+//         <TouchableOpacity
+//           style={styles.loginButton}
+//           onPress={handleLogin}
+//           disabled={fetchingUser || loggingIn}
+//         >
+//           <Text style={styles.loginButtonText}>
+//             {(fetchingUser || loggingIn) ? 'Logging in...' : 'Login'}
+//           </Text>
+//         </TouchableOpacity>
 
-//           {/* แสดง Register Container แบบ fixed ที่ด้านล่าง */}
-//           {/* <View style={styles.registerContainer}>
-//             <Text style={styles.registerText}>Don't have an account? </Text>
-//             <Pressable onPress={() => router.push('/register')}>
-//               <Text style={styles.registerLink}>Register Now</Text>
-//             </Pressable>
-//           </View> */}
-//         </SafeAreaView>
-//       </ScrollView>
-//     </View>
+//         <TouchableOpacity style={styles.resetpassword} onPress={() => router.push('/resetpassword')}>
+//           <Text style={styles.resetpasswordText}>ลืมรหัสผ่าน?</Text>
+//         </TouchableOpacity>
+//       </View>
+//     </SafeAreaView>
 //   );
 // }
 
 // const styles = StyleSheet.create({
 //   container: {
 //     flex: 1,
-//     backgroundColor: '#fff',
-//   },
-//   safeArea: {
-//     flex: 1,
 //     padding: 20,
-//     position: 'relative',
+//     backgroundColor: '#fff',
 //   },
 //   logoContainer: {
 //     alignItems: 'center',
-//     marginTop: Platform.OS === 'ios' ? 80 : 40,
-//     marginBottom: 40,
+//     marginVertical: 40,
 //   },
 //   logo: {
 //     width: 180,
 //     height: 180,
-//   },
-//   formContainer: {
-//     width: '100%',
-//   },
-//   input: {
-//     backgroundColor: '#F8F9FA',
-//     borderRadius: 12,
-//     padding: 15,
-//     marginBottom: 15,
-//     fontSize: 16,
 //   },
 //   passwordContainer: {
 //     flexDirection: 'row',
 //     alignItems: 'center',
 //     backgroundColor: '#F8F9FA',
 //     borderRadius: 12,
-//     marginBottom: 15,
+//     paddingHorizontal: 15,
+//     marginBottom: 20,
+//   },
+//   formContainer: {
+//     paddingHorizontal: 20,
+//   },
+//   input: {
+//     fontSize: 16,
+//     paddingVertical: 15,
+//     backgroundColor: '#F8F9FA',
+//     borderRadius: 12,
+//     marginBottom: 20,
+//     paddingHorizontal: 15,
 //   },
 //   passwordInput: {
 //     flex: 1,
-//     padding: 15,
 //     fontSize: 16,
-//   },
-//   eyeIcon: {
-//     padding: 15,
-//   },
-//   resetpassword: {
-//     alignSelf: 'flex-end',
-//     marginBottom: 20,
-//   },
-//   resetpasswordText: {
-//     color: '#666',
-//     fontSize: 16,
+//     paddingVertical: 15,
 //   },
 //   loginButton: {
 //     backgroundColor: '#249781',
 //     borderRadius: 12,
-//     padding: 16,
+//     paddingVertical: 15,
 //     alignItems: 'center',
-//     marginBottom: 30,
+//     marginTop: 20,
 //   },
 //   loginButtonText: {
 //     color: '#fff',
 //     fontSize: 18,
-//     fontWeight: '600',
 //   },
-//   registerContainer: {
-//     position: 'absolute',
-//     bottom: Platform.OS === 'ios' ? 40 : 20,
-//     left: 0,
-//     right: 0,
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginBottom: 30,
+//   resetpassword: {
+//     marginTop: 15,
+//     alignItems: 'flex-end',
 //   },
-//   registerText: {
-//     color: '#666',
-//     fontSize: 16,
-//   },
-//   registerLink: {
+//   resetpasswordText: {
 //     color: '#249781',
 //     fontSize: 16,
-//     fontWeight: '600',
 //   },
 // });
 
 
+// ******************************************** แบบแก้ Domain ********************************************
 
 
-
-
+// ******************************************** อีกทางเลือก********************************************
 
 import React, { useState } from 'react';
 import {
@@ -215,72 +185,53 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons as Icon } from '@expo/vector-icons';
 import { useLazyQuery, useMutation } from '@apollo/client';
 import loginMutation from '@/graphql/mutations/login.js';
 import getUserByEmail from '@/graphql/queries/getUserByEmail.js';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/config/firebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  const [fetchUser, { loading: fetchingUser }] = useLazyQuery(getUserByEmail);
-  const [login, { loading: loggingIn }] = useMutation(loginMutation);
-
-  // const handleLogin = async () => {
-  //   if (!email || !password) {
-  //     Alert.alert('Error', 'Please enter your email and password.');
-  //     return;
-  //   }
-
-  //   try {
-  //     // 1. ค้นหา _id ของ user จาก email
-  //     const { data } = await fetchUser({ variables: { email } });
-
-  //     if (!data?.userOne?._id) {
-  //       Alert.alert('Error', 'User not found.');
-  //       return;
-  //     }
-
-  //     const userId = data.userOne._id;
-
-  //     // 2. ทำการ login โดยใช้ userId + password
-  //     const { data: loginData } = await login({ variables: { _id: userId, password } });
-
-  //     if (loginData?.login?.token) {
-  //       await AsyncStorage.setItem('authToken', loginData.login.token);
-  //       router.replace('/'); // เปลี่ยนไปหน้าหลักหลังจาก login สำเร็จ
-  //     } else {
-  //       Alert.alert('Error', 'Invalid email or password.');
-  //     }
-  //   } catch (error) {
-  //     console.error('Login error:', error);
-  //     Alert.alert('Error', 'Failed to log in. Please try again.');
-  //   }
-  // };
+  const [fetchUser, { data: userData }] = useLazyQuery(getUserByEmail);
+  
 
   const handleLogin = async () => {
-        await AsyncStorage.removeItem("userToken");
-        if (email === 'admin' && password === '123456') {
-          const token = '123456abcdef';
-          await AsyncStorage.setItem('userToken', token);
-          router.replace('/');
-        } else {
-          Alert.alert('Login Failed', 'Invalid email or password');
-        }
-      };
+    if (!email || !password) {
+      Alert.alert('Error', 'กรุณากรอกอีเมลและรหัสผ่าน');
+      return;
+    }
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      Alert.alert('สำเร็จ', 'ล็อคอินสำเร็จ');
+      router.replace('/'); // ไปหน้าหลัก
+
+    } catch (error: any) {
+      console.log('Login error:', error);
+      if (error.code === 'auth/user-not-found') {
+        Alert.alert('Error', 'ไม่พบผู้ใช้นี้ในระบบ');
+      } else if (error.code === 'auth/wrong-password') {
+        Alert.alert('Error', 'รหัสผ่านไม่ถูกต้อง');
+      } else if (error.code === 'auth/network-request-failed') {
+        Alert.alert('Error', 'โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+      } else {
+        Alert.alert('Error', error.message);
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.logoContainer}>
-        <Image
-          source={require('../assets/images/parkrunlogo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Image source={require('../assets/images/parkrunlogo.png')} style={styles.logo} resizeMode="contain" />
       </View>
 
       <View style={styles.formContainer}>
@@ -290,6 +241,7 @@ export default function LoginScreen() {
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
+          autoCapitalize="none"
         />
 
         <View style={styles.passwordContainer}>
@@ -305,8 +257,8 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={fetchingUser || loggingIn}>
-          <Text style={styles.loginButtonText}>{(fetchingUser || loggingIn) ? 'Logging in...' : 'Login'}</Text>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+          <Text style={styles.loginButtonText}>เข้าสู่ระบบ</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.resetpassword} onPress={() => router.push('/resetpassword')}>
@@ -368,7 +320,7 @@ const styles = StyleSheet.create({
   },
   resetpassword: {
     marginTop: 15,
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   resetpasswordText: {
     color: '#249781',

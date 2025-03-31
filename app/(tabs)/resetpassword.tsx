@@ -46,9 +46,9 @@ export default function ResetPasswordScreen() {
           <ChevronLeft />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Forgot Password?</Text>
+        <Text style={styles.title}>รีเซ็ตรหัสผ่าน?</Text>
         <Text style={styles.subtitle}>
-          Don't worry! Enter your email address linked with your account.
+          กรุณากรอกอีเมลของคุณที่ได้ลงทะเบียนไว้กับ Parkrun Thailand.
         </Text>
 
         <TextInput

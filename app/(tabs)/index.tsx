@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Provider as PaperProvider, Card, Portal, Dialog, Button, Menu } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,22 +42,15 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
   const [selectedLocation, setSelectedLocation] = useState("");
   const [menuVisible, setMenuVisible] = useState(false);
   const [checkpointDialogVisible, setCheckpointDialogVisible] = useState(false);
+  const [userHasSelectedLocation, setUserHasSelectedLocation] = useState(false);
 
   const eventImage = event.image && event.image.trim() !== "" ? event.image : null;
   const eventLocation = data?.eventOne?.location || event.location;
-  
-  // Define checkpoint options based on event data
+
   const startPoint = data?.eventOne?.startPoint || "จุดเริ่มต้น";
   const finishPoint = data?.eventOne?.finishPoint || "จุดเส้นชัย";
-  // Filter out duplicate checkpoint options
   const CHECKPOINT_OPTIONS = [...new Set([startPoint, finishPoint])];
-  
-  // Set default selected location if not already set
-  useEffect(() => {
-    if (!selectedLocation && CHECKPOINT_OPTIONS.length > 0) {
-      setSelectedLocation(CHECKPOINT_OPTIONS[0]);
-    }
-  }, [data]);
+
 
   const rawLevels = data?.eventOne?.levels || "unknown";
   const eventLevels =
@@ -73,8 +67,13 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
   const handleEventPress = () => {
     setCheckpointDialogVisible(true);
   };
-  
+
   const handleConfirmCheckpoint = () => {
+    if (!selectedLocation || !CHECKPOINT_OPTIONS.includes(selectedLocation)) {
+      Alert.alert("กรุณาเลือกตำแหน่งเช็คอิน", "คุณต้องเลือกตำแหน่งก่อนกดตกลง");
+      return;
+    }    
+
     setCheckpointDialogVisible(false);
     router.push(`/event?id=${event._id}&position=${encodeURIComponent(selectedLocation)}`);
   };
@@ -90,7 +89,7 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
             />
             <View style={styles.eventInfo}>
               <Text style={styles.eventTitle}>{event.name}</Text>
-              
+
               <View style={styles.locationContainer}>
                 <Ionicons name="location-outline" size={16} color="#4DAEB6" />
                 <View style={styles.locationSelector}>
@@ -115,8 +114,7 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
           </Card.Content>
         </Card>
       </TouchableOpacity>
-      
-      {/* Checkpoint selection dialog */}
+
       <Portal>
         <Dialog
           visible={checkpointDialogVisible}
@@ -126,32 +124,33 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
           <Dialog.Title style={styles.dialogTitle}>เลือกตำแหน่งเช็คอิน</Dialog.Title>
           <Dialog.Content>
             {CHECKPOINT_OPTIONS.map((option, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 style={[styles.positionItem, selectedLocation === option && styles.selectedItem]}
-                onPress={() => setSelectedLocation(option)}
+                onPress={() => setSelectedLocation(option)} 
               >
-                <Ionicons 
-                  name={selectedLocation === option ? "radio-button-on" : "radio-button-off"} 
-                  size={24} 
-                  color="#249781" 
+                <Ionicons
+                  name={selectedLocation === option ? "radio-button-on" : "radio-button-off"}
+                  size={24}
+                  color="#249781"
                 />
                 <Text style={styles.positionText}>{option}</Text>
               </TouchableOpacity>
             ))}
           </Dialog.Content>
+
           <Dialog.Actions style={styles.dialogActions}>
-            <Button 
-              mode="contained" 
-              onPress={() => setCheckpointDialogVisible(false)} 
+            <Button
+              mode="contained"
+              onPress={() => setCheckpointDialogVisible(false)}
               style={styles.cancelButton}
               labelStyle={styles.buttonText}
             >
               ยกเลิก
             </Button>
-            <Button 
-              mode="contained" 
-              onPress={handleConfirmCheckpoint} 
+            <Button
+              mode="contained"
+              onPress={handleConfirmCheckpoint}
               style={styles.confirmButton}
               labelStyle={styles.buttonText}
             >
@@ -171,14 +170,14 @@ export default function App() {
   const { loading, error, data } = useQuery(getAllEvent);
 
   const handleLogout = async () => {
-    setLogoutDialogVisible(false); // ปิด Dialog ก่อน
-    await AsyncStorage.removeItem("userToken"); // 🔥 ลบ Token ออกจาก Storage
-  
+    setLogoutDialogVisible(false); 
+    await AsyncStorage.removeItem("userToken"); 
+
     setTimeout(() => {
-      router.replace("/login"); // ✅ เปลี่ยนหน้าไป login
-    }, 500); // หน่วงเวลาสั้น ๆ เพื่อให้ UI อัปเดต
+      router.replace("/login"); 
+    }, 500); 
   };
-  
+
 
   if (loading) {
     return (
@@ -202,7 +201,7 @@ export default function App() {
 
   const events = data?.eventMany || [];
 
-  
+
   return (
     <PaperProvider>
       <SafeAreaView style={styles.container}>
@@ -215,8 +214,8 @@ export default function App() {
             />
 
             <View style={styles.textContainer}>
-              <TouchableOpacity 
-                onPress={() => setLogoutDialogVisible(true)} 
+              <TouchableOpacity
+                onPress={() => setLogoutDialogVisible(true)}
                 style={styles.logoutButton}
               >
                 <Ionicons name="log-out-outline" size={24} color="white" />
@@ -273,17 +272,17 @@ export default function App() {
               </Text>
             </Dialog.Content>
             <Dialog.Actions style={styles.dialogActions}>
-              <Button 
-                mode="contained" 
-                onPress={() => setLogoutDialogVisible(false)} 
+              <Button
+                mode="contained"
+                onPress={() => setLogoutDialogVisible(false)}
                 style={styles.cancelButton}
                 labelStyle={styles.buttonText}
               >
                 ยกเลิก
               </Button>
-              <Button 
-                mode="contained" 
-                onPress={handleLogout} 
+              <Button
+                mode="contained"
+                onPress={handleLogout}
                 style={styles.confirmButton}
                 labelStyle={styles.buttonText}
               >
@@ -509,6 +508,6 @@ const styles = StyleSheet.create({
   logoutButton: {
     position: 'absolute',
     right: 0,
-    top: -30, 
+    top: -30,
   },
 });

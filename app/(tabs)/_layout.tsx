@@ -1,26 +1,25 @@
 import { Stack, useLocalSearchParams, useRouter, useGlobalSearchParams } from "expo-router";
-import { Alert, View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from "react-native";
+import { Alert, View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from "@apollo/client";
 import getEvent from "@/graphql/queries/getEventOne";
 import { useMemo } from "react";
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 
 // Header component
 const CustomHeader = () => {
   const params = useLocalSearchParams();
   const globalParams = useGlobalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  // 🔹 ดึง _id จาก params
-  const eventId = params.id || globalParams.id;
-
-  // 🔹 ใช้ useQuery เพื่อดึงข้อมูล event ตาม _id
+  const rawEventId = params.id || globalParams.id;
+  const eventId = Array.isArray(rawEventId) ? rawEventId[0] : rawEventId;
   const { loading, error, data } = useQuery(getEvent, {
     variables: { _id: eventId },
-    skip: !eventId, // ถ้าไม่มี _id ไม่ต้อง query
+    skip: !eventId,
   });
 
-  // 🔹 ใช้ useMemo เพื่อดึง title จาก eventOne
   const title = useMemo(() => {
     if (loading) return "กำลังโหลด...";
     if (error) return "เกิดข้อผิดพลาด";
@@ -28,21 +27,22 @@ const CustomHeader = () => {
   }, [loading, error, data]);
 
   return (
-    <View style={styles.header}>
-      <View style={styles.headerContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
-          <Text style={styles.headerText}>ข้อมูลสนาม</Text>
-        </TouchableOpacity>
+    <SafeAreaView edges={['top']} style={{ backgroundColor: '#249781' }}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
 
-        <Image
-          source={require('@/assets/images/parkrunlogo.png')}
-          style={styles.logo}
-        />
+          <Image
+            source={require('@/assets/images/parkrunlogo.png')}
+            style={styles.logo}
+          />
+        </View>
+
+        <Text style={styles.title}>{title}</Text>
       </View>
-
-      <Text style={styles.title}>{title}</Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -50,7 +50,7 @@ export default function Layout() {
   return (
     <Stack
       screenOptions={({ route }) => ({
-        headerShown: !['index', 'login', 'resetpassword', 'forgotpassword'].includes(route.name),
+        headerShown: !['index', 'login', 'scanner', 'resetpassword', 'forgotpassword'].includes(route.name),
         header: () => <CustomHeader />,
         contentStyle: { backgroundColor: '#fff' }
       })}
@@ -61,8 +61,9 @@ export default function Layout() {
 const styles = StyleSheet.create({
   header: {
     backgroundColor: '#249781',
-    paddingTop: 60,
     paddingBottom: 10,
+    height: 100,
+    justifyContent: 'flex-end',
   },
   headerContent: {
     flexDirection: 'row',

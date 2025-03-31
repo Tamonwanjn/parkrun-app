@@ -16,7 +16,17 @@ export default function BlurTabBarBackground() {
 }
 
 export function useBottomTabOverflow() {
-  const tabHeight = useBottomTabBarHeight();
   const { bottom } = useSafeAreaInsets();
+  
+  // Try to get the tab bar height, but handle the case when it's not available
+  let tabHeight = 0;
+  try {
+    tabHeight = useBottomTabBarHeight();
+  } catch (error) {
+    // If we can't get the tab bar height, use a default value or just the bottom inset
+    console.warn('Could not get bottom tab bar height, using fallback value');
+    tabHeight = bottom + 49; // Default iOS tab bar height is approximately 49
+  }
+  
   return tabHeight - bottom;
 }

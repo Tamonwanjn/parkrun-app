@@ -47,8 +47,8 @@ export default function ForgotPasswordScreen() {
           <ChevronLeft />
         </TouchableOpacity>
 
-        <Text style={styles.heading}>Create new password</Text>
-        <Text style={styles.subtitle}>Your new password must be unique from those previously used.</Text>
+        <Text style={styles.heading}>สร้างรหัสผ่านใหม่</Text>
+        <Text style={styles.subtitle}>คุณสามารถรีเซ็ตรหัสผ่านได้แล้ว!</Text>
 
         <TextInput
           style={styles.input}
