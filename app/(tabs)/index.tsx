@@ -11,15 +11,16 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import { Provider as PaperProvider, Card, Portal, Dialog, Button, Menu } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@apollo/client';
-import getAllEvent from '../../graphql/queries/getAllEvent';
 import getEvent from '../../graphql/queries/getEventOne';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import getRaceVolunteer from '../../graphql/queries/getRaceVolunteer';
 
 interface Event {
   _id: string;
@@ -37,29 +38,29 @@ const statusConfig = {
   ปฏิเสธ: { color: "#DC2626", backgroundColor: "#FFDAD9" },
 };
 
-const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) => {
-  const { loading, error, data } = useQuery(getEvent, { variables: { _id: event._id } });
+const EventCard = ({ event, onPress }: { event: any; onPress: () => void }) => {
+  const { loading, error, data } = useQuery(getEvent, { variables: { _id: event.eventId } }); // ใช้ eventId จาก race
+
   const [selectedLocation, setSelectedLocation] = useState("");
-  const [menuVisible, setMenuVisible] = useState(false);
   const [checkpointDialogVisible, setCheckpointDialogVisible] = useState(false);
-  const [userHasSelectedLocation, setUserHasSelectedLocation] = useState(false);
 
-  const eventImage = event.image && event.image.trim() !== "" ? event.image : null;
-  const eventLocation = data?.eventOne?.location || event.location;
+  const eventData = data?.eventOne;
 
-  const startPoint = data?.eventOne?.startPoint || "จุดเริ่มต้น";
-  const finishPoint = data?.eventOne?.finishPoint || "จุดเส้นชัย";
+  const eventImage = eventData?.image || null;
+  const eventLocation = eventData?.location || "ไม่ระบุสถานที่";
+
+  const startPoint = eventData?.startPoint || "จุดเริ่มต้น";
+  const finishPoint = eventData?.finishPoint || "จุดเส้นชัย";
   const CHECKPOINT_OPTIONS = [...new Set([startPoint, finishPoint])];
 
-
-  const rawLevels = data?.eventOne?.levels || "unknown";
+  const rawLevels = eventData?.levels || "unknown";
   const eventLevels =
     rawLevels === "every"
       ? "จัดทุกสัปดาห์"
       : rawLevels === "twice"
-        ? "จัดเดือนละ 2 ครั้ง (จัดวันเสาร์แรกและเสาร์สามของเดือน)"
+        ? "จัดเดือนละ 2 ครั้ง (เสาร์แรกและเสาร์สาม)"
         : rawLevels === "once"
-          ? "จัดเดือนละ 1 ครั้ง (จัดวันเสาร์แรก)"
+          ? "จัดเดือนละ 1 ครั้ง (เสาร์แรก)"
           : "ไม่ระบุ";
 
   const router = useRouter();
@@ -72,10 +73,9 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
     if (!selectedLocation || !CHECKPOINT_OPTIONS.includes(selectedLocation)) {
       Alert.alert("กรุณาเลือกตำแหน่งเช็คอิน", "คุณต้องเลือกตำแหน่งก่อนกดตกลง");
       return;
-    }    
-
+    }
     setCheckpointDialogVisible(false);
-    router.push(`/event?id=${event._id}&position=${encodeURIComponent(selectedLocation)}`);
+    router.push(`/event?id=${event.eventId}&position=${encodeURIComponent(selectedLocation)}`);
   };
 
   return (
@@ -90,6 +90,7 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
             <View style={styles.eventInfo}>
               <Text style={styles.eventTitle}>{event.name}</Text>
 
+              {/* ✅ ข้อมูล event ตรงนี้ */}
               <View style={styles.locationContainer}>
                 <Ionicons name="location-outline" size={16} color="#4DAEB6" />
                 <View style={styles.locationSelector}>
@@ -127,7 +128,7 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
               <TouchableOpacity
                 key={index}
                 style={[styles.positionItem, selectedLocation === option && styles.selectedItem]}
-                onPress={() => setSelectedLocation(option)} 
+                onPress={() => setSelectedLocation(option)}
               >
                 <Ionicons
                   name={selectedLocation === option ? "radio-button-on" : "radio-button-off"}
@@ -166,18 +167,53 @@ const EventCard = ({ event, onPress }: { event: Event; onPress: () => void }) =>
 export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
-  const { loading, error, data } = useQuery(getAllEvent);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      if (storedUserId && storedUserId !== "") {
+        setUserId(storedUserId);
+      } else {
+        console.warn("ไม่มี userId หรือ userId ไม่ถูกต้อง");
+        router.replace("/login");
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  const { loading, error, data } = useQuery(getRaceVolunteer, {
+    variables: { userId },
+    skip: !userId,
+  });
 
   const handleLogout = async () => {
-    setLogoutDialogVisible(false); 
-    await AsyncStorage.removeItem("userToken"); 
-
-    setTimeout(() => {
-      router.replace("/login"); 
-    }, 500); 
+    try {
+      // Hide dialog and clear state first
+      setLogoutDialogVisible(false);
+      setUserId(null);
+      
+      // Reset any other state variables
+      setSearchQuery("");
+      
+      // Clear stored data
+      await AsyncStorage.clear();
+      
+      // Wrap navigation in requestAnimationFrame
+      requestAnimationFrame(() => {
+        // Use replace to prevent going back
+        router.replace("/login");
+      });
+      
+    } catch (error) {
+      console.error("Logout error:", error);
+      Alert.alert(
+        "เกิดข้อผิดพลาด",
+        "ไม่สามารถออกจากระบบได้ กรุณาลองใหม่อีกครั้ง"
+      );
+    }
   };
-
 
   if (loading) {
     return (
@@ -195,11 +231,11 @@ export default function App() {
     );
   }
 
-  const filteredEvents = data?.eventMany.filter((event: Event) =>
+  const events = data?.getRaceVolunteer || [];
+
+  const filteredEvents = events.filter((event: any) =>
     event.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
-
-  const events = data?.eventMany || [];
 
 
   return (
@@ -249,7 +285,7 @@ export default function App() {
 
         <FlatList
           data={filteredEvents}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => `${item._id}_${index}`}
           renderItem={({ item }) => (
             <EventCard event={item} onPress={() => router.push({ pathname: "/event", params: { id: item._id } })} />
           )}
@@ -257,6 +293,7 @@ export default function App() {
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={<View style={{ height: 20 }} />}
         />
+
 
         {/* Logout confirmation dialog */}
         <Portal>

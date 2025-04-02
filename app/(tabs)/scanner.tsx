@@ -183,10 +183,10 @@ export default function Scanner() {
         </View>
 
         <View style={[styles.cameraControls, { justifyContent: 'center' }]}>
-          {/* <TouchableOpacity style={styles.scanActionButton} onPress={pickImage}>
+          <TouchableOpacity style={styles.scanActionButton} onPress={pickImage}>
             <Ionicons name="images-outline" size={24} color="#fff" />
             <Text style={[styles.scanActionText, { fontFamily: 'NotoSansThai-Regular' }]}>เลือกรูป QR</Text>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.doneButton, { alignSelf: 'center' }]}

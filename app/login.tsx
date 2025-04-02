@@ -206,27 +206,48 @@ export default function LoginScreen() {
       Alert.alert('Error', 'กรุณากรอกอีเมลและรหัสผ่าน');
       return;
     }
-
+  
     try {
+      // ล็อคอินด้วย Firebase ก่อน
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+  
+      // เรียก GraphQL query ตรวจสอบ email กับฐานข้อมูล
+      const { data } = await fetchUser({ variables: { email } });
+  
+      console.log('GraphQL response:', data);
+  
+      if (data?.userOne?._id) {
+        console.log(`Email ${email} ตรงกับ _id: ${data.userOne._id}`);
+        
+        // ✅ เก็บ userId ลง AsyncStorage
+        await AsyncStorage.setItem('userId', data.userOne._id);
+      } else {
+        Alert.alert('Error', 'ไม่พบข้อมูลผู้ใช้จากอีเมลนี้ในระบบ');
+        return; // หากไม่มี userId ให้หยุดฟังก์ชัน
+      }
+  
       Alert.alert('สำเร็จ', 'ล็อคอินสำเร็จ');
       router.replace('/'); // ไปหน้าหลัก
-
+  
     } catch (error: any) {
       console.log('Login error:', error);
-      if (error.code === 'auth/user-not-found') {
-        Alert.alert('Error', 'ไม่พบผู้ใช้นี้ในระบบ');
-      } else if (error.code === 'auth/wrong-password') {
-        Alert.alert('Error', 'รหัสผ่านไม่ถูกต้อง');
-      } else if (error.code === 'auth/network-request-failed') {
-        Alert.alert('Error', 'โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-      } else {
-        Alert.alert('Error', error.message);
+      let errorMessage = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'ไม่พบผู้ใช้นี้ในระบบ';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'รหัสผ่านไม่ถูกต้อง';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+          break;
       }
+      Alert.alert('Error', errorMessage);
     }
-  };
+  };  
+
 
   return (
     <SafeAreaView style={styles.container}>
