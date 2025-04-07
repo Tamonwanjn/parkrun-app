@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Surface, Portal, Dialog } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { Camera, CameraView } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
+// import * as ImagePicker from "expo-image-picker";
 import { useQuery } from "@apollo/client";
 import getEvent from "@/graphql/queries/getEventOne";
 import races from "@/graphql/queries/races";
@@ -31,17 +31,15 @@ const THEME_COLORS = {
   white: "#FFFFFF",
 };
 
-// Main Event Component
 export default function Event() {
   const { id, position, date } = useLocalSearchParams();
   const eventDate = Array.isArray(date) ? date[0] : date;
   const [scannedRunners, setScannedRunners] = useState<Runner[]>([]);
   const router = useRouter();
 
-  // GraphQL query
   const { loading, error, data } = useQuery(getEvent, {
     variables: { _id: id },
-    skip: !id, // Skip if no id is provided
+    skip: !id,
   });
 
   const { loading: raceLoading, error: raceError, data: raceData } = useQuery(races, {
@@ -51,17 +49,15 @@ export default function Event() {
 
   const { loading: runnerLoading, error: runnerError, data: runnerData } = useQuery(getRunnersByEvent, {
     variables: { eventId: id },
-    skip: !id, // ถ้าไม่มี id ให้ข้ามการ query
+    skip: !id, 
   });
 
   const event = data?.eventOne;
   const startPoint = event?.startPoint || "จุดเริ่มต้นไม่ระบุ";
   const finishPoint = event?.finishPoint || "จุดเส้นชัยไม่ระบุ";
 
-  // Filter out duplicate checkpoint options
   const CHECKPOINT_OPTIONS = [...new Set([startPoint, finishPoint])];
 
-  // Initialize selectedLocation with the position from URL parameters if available
   const initialPosition = typeof position === 'string' ? position : CHECKPOINT_OPTIONS[0];
   const [selectedLocation, setSelectedLocation] = useState(initialPosition);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -76,7 +72,16 @@ export default function Event() {
   const combinedRunners = [...runners, ...scannedRunners];
   const [checkedInCount, setCheckedInCount] = useState(0);
 
-  // Add eventLevels formatting similar to index.tsx
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const showCustomAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
   const rawLevels = event?.levels || "ไม่ระบุ";
   const eventLevels =
     rawLevels === "every"
@@ -87,7 +92,6 @@ export default function Event() {
           ? "จัดเดือนละ 1 ครั้ง (จัดวันเสาร์แรก)"
           : "ไม่ระบุ";
 
-  // Animation functions
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.95,
@@ -102,40 +106,41 @@ export default function Event() {
     }).start();
   };
 
-  // อันนี้คือ set ให้สแกนหลัง 10 โมงไม่ได้ 
-  // const handleScanPress = () => {
-  //   if (!race?.startTime) {
-  //     Alert.alert("ไม่สามารถสแกนร่วมงานได้", "ไม่พบข้อมูลเวลาเริ่มงาน");
-  //     return;
-  //   }
+  // สำหรับ set ให้สแกนหลัง 10 โมงไม่ได้ 
+  const handleScanPress = () => {
+    if (!race?.startTime) {
+      showCustomAlert("ไม่สามารถสแกนร่วมงานได้", "ไม่พบข้อมูลเวลาเริ่มงาน");
+      return;
+    }
 
-  //   const startDate = new Date(race.startTime);
-  //   const oneHourBefore = new Date(startDate);
-  //   oneHourBefore.setHours(startDate.getHours() - 1); // 1 ชั่วโมงก่อนเวลาเริ่ม
+    const startDate = new Date(race.startTime);
+    const oneHourBefore = new Date(startDate);
+    oneHourBefore.setHours(startDate.getHours() - 1);
 
-  //   const cutoffTime = new Date(startDate);
-  //   cutoffTime.setHours(10, 0, 0); // ตั้งเวลาปิดรับสแกนเป็น 10:00 น.
+    const cutoffTime = new Date(startDate);
+    cutoffTime.setHours(10, 0, 0);
 
-  //   const now = new Date();
+    const now = new Date();
 
-  //   if (now < oneHourBefore) {
-  //     Alert.alert(
-  //       "ไม่สามารถสแกนได้",
-  //       `สามารถสแกนได้ 1 ชั่วโมงก่อนเวลาเริ่มงาน (${oneHourBefore.toLocaleTimeString('th-TH')})`
-  //     );
-  //     return;
-  //   }
+    if (now < oneHourBefore) {
+      showCustomAlert(
+        "ไม่สามารถสแกนได้",
+        `สามารถสแกนได้ 1 ชั่วโมงก่อนเวลาเริ่มงาน (${oneHourBefore.toLocaleTimeString('th-TH')})`
+      );
+      return;
+    }
 
-  //   if (now > cutoffTime) {
-  //     Alert.alert(
-  //       "ไม่สามารถสแกนได้",
-  //       "ขณะนี้เลยเวลาสแกนเข้าร่วมงานแล้ว (หลัง 10:00 น.)"
-  //     );
-  //     return;
-  //   }
+    if (now > cutoffTime) {
+      showCustomAlert(
+        "ไม่สามารถสแกนได้",
+        "ขณะนี้เลยเวลาสแกนเข้าร่วมงานแล้ว (หลัง 10:00 น.)"
+      );
+      return;
+    }
 
-  //   router.push(`/scanner?id=${id}&position=${selectedLocation}&date=${eventDate}`);
-  // };
+    router.push(`/scanner?id=${id}&position=${selectedLocation}&date=${eventDate}`);
+  };
+    // สำหรับ set ให้สแกนหลัง 10 โมงไม่ได้
 
   const renderInfoItem = (icon: string, label: string, value: string | number) => (
     <View style={styles.infoRow}>
@@ -159,10 +164,10 @@ export default function Event() {
     });
   };
   const renderRunnerCard = (runner: Runner, index: number) => (
-    <Surface 
-      key={runner._id} 
+    <Surface
+      key={runner._id}
       style={[
-        styles.runnerCard, 
+        styles.runnerCard,
         { backgroundColor: index % 2 === 0 ? '#FFFFFF' : '#80CFC0' }
       ]}
     >
@@ -200,9 +205,9 @@ export default function Event() {
               time: item.time
             }));
             setScannedRunners(formatted);
-            setCheckedInCount(parsed.length); // Update counter
+            setCheckedInCount(parsed.length);
           } else {
-            setCheckedInCount(0); // Reset counter if no data
+            setCheckedInCount(0);
           }
         } catch (error) {
           console.error('ไม่สามารถโหลดข้อมูลจาก AsyncStorage', error);
@@ -253,22 +258,21 @@ export default function Event() {
         </Surface>
 
         <Surface style={styles.runnerListBox}>
-  <Text style={[styles.infoLabel, { fontSize: 18, fontWeight: "bold", marginBottom: 8 }]}>
-    รายชื่อนักวิ่งที่เข้าร่วม
-  </Text>
+          <Text style={[styles.infoLabel, { fontSize: 18, fontWeight: "bold", marginBottom: 8 }]}>
+            รายชื่อนักวิ่งที่เข้าร่วม
+          </Text>
 
-  {runnerLoading ? (
-    <Text style={styles.loadingText}>กำลังโหลดข้อมูลนักวิ่ง...</Text>
-  ) : combinedRunners.length > 0 ? (
-    combinedRunners.map(renderRunnerCard)
-  ) : (
-    <Text style={styles.errorText}>ไม่มีผู้เข้าร่วม</Text>
-  )}
-</Surface>
+          {runnerLoading ? (
+            <Text style={styles.loadingText}>กำลังโหลดข้อมูลนักวิ่ง...</Text>
+          ) : combinedRunners.length > 0 ? (
+            combinedRunners.map(renderRunnerCard)
+          ) : (
+            <Text style={styles.errorText}>ไม่มีผู้เข้าร่วม</Text>
+          )}
+        </Surface>
 
       </ScrollView>
 
-      {/* Bottom bar with scan button */}
       <Surface style={styles.bottomBar}>
         <View style={styles.dropdownContainer}>
           <Button
@@ -281,8 +285,8 @@ export default function Event() {
           </Button>
         </View>
 
-        {/* ปุ่มสแกน QR code แบบธรรมดา*/}
-        <TouchableOpacity
+        {/* ปุ่มสแกน QR code เวลาไหนก็ได้*/}
+        {/* <TouchableOpacity
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={0.8}
@@ -292,9 +296,11 @@ export default function Event() {
             <Ionicons name="qr-code" size={24} color={THEME_COLORS.white} />
             <Text style={styles.buttonText}>สแกน</Text>
           </Animated.View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
+        {/* ปุ่มสแกน QR code เวลาไหนก็ได้*/}
+
         {/* ปุ่มสแกน QR code แบบห้ามสแกนหลัง10โมง*/}
-        {/* <TouchableOpacity
+        <TouchableOpacity
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={0.8}
@@ -304,10 +310,10 @@ export default function Event() {
             <Ionicons name="qr-code" size={24} color={THEME_COLORS.white} />
             <Text style={styles.buttonText}>สแกน</Text>
           </Animated.View>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
+         {/* ปุ่มสแกน QR code แบบห้ามสแกนหลัง10โมง*/}
       </Surface>
 
-      {/* Checkpoint selection dialog */}
       <Portal>
         <Dialog
           visible={dialogVisible}
@@ -353,7 +359,29 @@ export default function Event() {
             </Button>
           </Dialog.Actions>
         </Dialog>
+
+        <Dialog
+          visible={alertVisible}
+          onDismiss={() => setAlertVisible(false)}
+          style={styles.dialogContainer}
+        >
+          <Dialog.Title style={styles.dialogTitle}>{alertTitle}</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.dialogContent}>{alertMessage}</Text>
+          </Dialog.Content>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button
+              mode="contained"
+              onPress={() => setAlertVisible(false)}
+              style={styles.confirmButton}
+              labelStyle={styles.buttonText}
+            >
+              ตกลง
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
+
     </>
   );
 }
@@ -379,6 +407,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 10,
   },
+  dialogContent: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    fontFamily: 'NotoSansThai-Regular',
+    marginVertical: 10,
+  },  
   positionItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -415,7 +450,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 100,
-    flexGrow: 1, 
+    flexGrow: 1,
   },
   loadingText: {
     textAlign: 'center',
@@ -489,8 +524,8 @@ const styles = StyleSheet.create({
     margin: 16,
     elevation: 1,
     marginBottom: 5,
-    flex: 1, 
-    minHeight: 300, 
+    flex: 1,
+    minHeight: 300,
   },
   runnerCard: {
     backgroundColor: "#fff",

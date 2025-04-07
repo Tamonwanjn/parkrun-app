@@ -90,7 +90,6 @@ const EventCard = ({ event, onPress }: { event: any; onPress: () => void }) => {
             <View style={styles.eventInfo}>
               <Text style={styles.eventTitle}>{event.name}</Text>
 
-              {/* ✅ ข้อมูล event ตรงนี้ */}
               <View style={styles.locationContainer}>
                 <Ionicons name="location-outline" size={16} color="#4DAEB6" />
                 <View style={styles.locationSelector}>
@@ -190,19 +189,11 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      // Hide dialog and clear state first
       setLogoutDialogVisible(false);
       setUserId(null);
-      
-      // Reset any other state variables
       setSearchQuery("");
-      
-      // Clear stored data
       await AsyncStorage.clear();
-      
-      // Wrap navigation in requestAnimationFrame
       requestAnimationFrame(() => {
-        // Use replace to prevent going back
         router.replace("/login");
       });
       
@@ -233,11 +224,15 @@ export default function App() {
 
   const events = data?.getRaceVolunteer || [];
 
-  const filteredEvents = events.filter((event: any) =>
+  const uniqueEvents = events.filter(
+    (event, index, self) =>
+      index === self.findIndex((e) => e._id === event._id)
+  );
+  
+  const filteredEvents = uniqueEvents.filter((event: any) =>
     event.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
-
-
+  
   return (
     <PaperProvider>
       <SafeAreaView style={styles.container}>
@@ -257,7 +252,7 @@ export default function App() {
                 <Ionicons name="log-out-outline" size={24} color="white" />
               </TouchableOpacity>
               <Text style={styles.topTitle}>อาสาสมัครทั้งหมด</Text>
-              <Text style={styles.topSubtitle}>{events.length} สนาม</Text>
+              <Text style={styles.topSubtitle}>{uniqueEvents.length} สนาม</Text>
             </View>
           </View>
           <View style={styles.searchContainer}>

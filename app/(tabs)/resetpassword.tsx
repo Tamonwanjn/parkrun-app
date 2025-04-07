@@ -24,7 +24,7 @@ export default function ResetPasswordScreen() {
   
     try {
       const { data } = await fetchUser({ variables: { email } });
-      console.log('GraphQL response:', data); // เช็กข้อมูลที่ response กลับมา
+      console.log('GraphQL response:', data); 
   
       if (data?.userOne?._id) {
         router.push({ pathname: '/forgotpassword', params: { _id: data.userOne._id } });

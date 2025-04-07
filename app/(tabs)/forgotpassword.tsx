@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@apollo/client';
 import changePasswordMutation from '@/graphql/mutations/changePassword.js';
 import Svg, { Path } from 'react-native-svg';
+import { Button, Dialog } from "react-native-paper";
 
 const ChevronLeft = () => (
   <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
@@ -18,26 +19,40 @@ export default function ForgotPasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changePassword, { loading }] = useMutation(changePasswordMutation);
 
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const showCustomAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
+
   const handleResetPassword = async () => {
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showCustomAlert('Error', 'Passwords do not match');
       return;
     }
 
     if (!_id) {
-      Alert.alert('Error', 'User ID is missing');
+      showCustomAlert('Error', 'User ID is missing');
       return;
     }
 
     try {
       await changePassword({ variables: { _id, password: newPassword } });
-      Alert.alert('Success', 'Password changed successfully');
-      router.replace('/login');
+      showCustomAlert('Success', 'Password changed successfully');
+      setTimeout(() => {
+        router.replace('/login');
+      }, 500);
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to change password');
+      showCustomAlert('Error', 'Failed to change password');
     }
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -59,17 +74,41 @@ export default function ForgotPasswordScreen() {
         />
 
         <TextInput
-          style={[styles.input, { marginTop: 10 }]} 
+          style={[styles.input, { marginTop: 10 }]}
           placeholder="Confirm Password"
           secureTextEntry
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
 
-        <TouchableOpacity style={[styles.resetButton, { marginTop: 50 }]}  onPress={handleResetPassword} disabled={loading}>
+        <TouchableOpacity style={[styles.resetButton, { marginTop: 50 }]} onPress={handleResetPassword} disabled={loading}>
           <Text style={styles.resetButtonText}>{loading ? 'Resetting...' : 'Reset Password'}</Text>
         </TouchableOpacity>
       </View>
+
+      <Dialog
+        visible={alertVisible}
+        onDismiss={() => {
+          setAlertVisible(false);
+        }}
+        style={styles.dialogContainer}
+      >
+        <Dialog.Title style={styles.dialogTitle}>{alertTitle}</Dialog.Title>
+        <Dialog.Content>
+          <Text style={styles.dialogContent}>{alertMessage}</Text>
+        </Dialog.Content>
+        <Dialog.Actions style={styles.dialogActions}>
+          <Button
+            mode="contained"
+            onPress={() => setAlertVisible(false)}
+            style={styles.confirmButton}
+            labelStyle={styles.buttonText}
+          >
+            ตกลง
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+
     </SafeAreaView>
   );
 }
@@ -131,5 +170,42 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '500',
+  },
+  dialogContainer: {
+    borderRadius: 16,
+    backgroundColor: "white",
+    paddingBottom: 16,
+    elevation: 5,
+},
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 16,
+    fontFamily: 'NotoSansThai-Regular',
+  },
+  dialogContent: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    fontFamily: 'NotoSansThai-Regular',
+    marginVertical: 10,
+  },
+  dialogActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: "#249781",
+    borderRadius: 8,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: 'NotoSansThai-Regular',
   },
 });

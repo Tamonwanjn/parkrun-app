@@ -12,8 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { Button } from "react-native-paper";
-import * as Haptics from "expo-haptics";
+import { Button, Dialog } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLazyQuery } from "@apollo/client";
 import userById from "@/graphql/queries/getUserOne";
@@ -37,6 +36,16 @@ export default function Scanner() {
   const [getUser] = useLazyQuery(userById);
   const [qrImageUri, setQrImageUri] = useState<string | null>(null);
 
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const showCustomAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
 
   useEffect(() => {
     (async () => {
@@ -44,7 +53,7 @@ export default function Scanner() {
       setHasPermission(status === "granted");
     })();
 
-    loadRunnerList(); 
+    loadRunnerList();
   }, [id]);
 
   useEffect(() => {
@@ -53,7 +62,7 @@ export default function Scanner() {
 
   const loadRunnerList = async () => {
     try {
-      const savedList = await AsyncStorage.getItem(`runnerList_${id}`); // เพิ่ม event id ต่อท้าย key
+      const savedList = await AsyncStorage.getItem(`runnerList_${id}`);
       if (savedList) {
         setRunnerList(JSON.parse(savedList));
       }
@@ -64,7 +73,7 @@ export default function Scanner() {
 
   const saveRunnerList = async () => {
     try {
-      await AsyncStorage.setItem(`runnerList_${id}`, JSON.stringify(runnerList)); // เพิ่ม event id ต่อท้าย key
+      await AsyncStorage.setItem(`runnerList_${id}`, JSON.stringify(runnerList)); 
     } catch (error) {
       console.error("Failed to save runner list", error);
     }
@@ -82,16 +91,16 @@ export default function Scanner() {
 
     setRunnerList((prevList) => {
       const newList = [newRunner, ...prevList];
-      // บันทึกข้อมูลทันทีที่มีการเพิ่ม runner
       AsyncStorage.setItem(`runnerList_${id}`, JSON.stringify(newList))
         .catch(error => console.error("Failed to save runner list", error));
       return newList;
     });
   };
 
+
   const processQRScan = async (data: string) => {
     if (data.length !== 24) {
-      Alert.alert("QR ไม่ถูกต้อง", "ข้อมูล QR ไม่ถูกต้อง");
+      showCustomAlert("QR ไม่ถูกต้อง", "ข้อมูล QR ไม่ถูกต้อง");
       qrLock.current = false;
       return;
     }
@@ -102,20 +111,22 @@ export default function Scanner() {
 
       if (user) {
         addRunner(data, user.name, user.bib);
-        Alert.alert("สแกนสำเร็จ", `พบข้อมูลผู้ใช้: ${user.name}`);
+        showCustomAlert("สแกนสำเร็จ", `พบข้อมูลผู้ใช้: ${user.name}`);
       } else {
         addRunner(data);
-        Alert.alert("สแกนไม่สำเร็จ", "ไม่พบข้อมูลผู้ใช้");
+        showCustomAlert("สแกนไม่สำเร็จ", "ไม่พบข้อมูลผู้ใช้");
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
       addRunner(data);
+      showCustomAlert("ข้อผิดพลาด", "เกิดข้อผิดพลาดขณะตรวจสอบข้อมูลผู้ใช้");
     }
 
     setTimeout(() => {
       qrLock.current = false;
     }, 2000);
   };
+
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -173,7 +184,7 @@ export default function Scanner() {
           onBarcodeScanned={({ data }) => {
             if (data && !qrLock.current) {
               qrLock.current = true;
-              processQRScan(data); 
+              processQRScan(data);
             }
           }}
         />
@@ -183,10 +194,12 @@ export default function Scanner() {
         </View>
 
         <View style={[styles.cameraControls, { justifyContent: 'center' }]}>
-          <TouchableOpacity style={styles.scanActionButton} onPress={pickImage}>
+
+          //เลือกรูป QR จากคลังภาพ
+          {/* <TouchableOpacity style={styles.scanActionButton} onPress={pickImage}>
             <Ionicons name="images-outline" size={24} color="#fff" />
             <Text style={[styles.scanActionText, { fontFamily: 'NotoSansThai-Regular' }]}>เลือกรูป QR</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity
             style={[styles.doneButton, { alignSelf: 'center' }]}
@@ -226,10 +239,30 @@ export default function Scanner() {
           </View>
         )}
       </View>
+      <Dialog
+        visible={alertVisible}
+        onDismiss={() => setAlertVisible(false)}
+        style={styles.dialogContainer}
+      >
+        <Dialog.Title style={styles.dialogTitle}>{alertTitle}</Dialog.Title>
+        <Dialog.Content>
+          <Text style={styles.dialogContent}>{alertMessage}</Text>
+        </Dialog.Content>
+        <Dialog.Actions style={styles.dialogActions}>
+          <Button
+            mode="contained"
+            onPress={() => setAlertVisible(false)}
+            style={styles.confirmButton}
+            labelStyle={styles.buttonText}
+          >
+            ตกลง
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -356,5 +389,42 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 14,
     fontFamily: 'NotoSansThai-Regular'
-  }
+  },
+  dialogContainer: {
+    borderRadius: 16,
+    backgroundColor: "white",
+    paddingBottom: 16,
+    elevation: 5,
+},
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 16,
+    fontFamily: 'NotoSansThai-Regular',
+  },
+  dialogContent: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    fontFamily: 'NotoSansThai-Regular',
+    marginVertical: 10,
+  },
+  dialogActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: "#249781",
+    borderRadius: 8,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: 'NotoSansThai-Regular',
+  },
 });

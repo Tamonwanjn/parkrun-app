@@ -5,9 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/parkrunicon.png",
-    "scheme": "myapp",
+    "scheme": "parkrunvolunteerapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thairunapps.parkrunapps",
@@ -21,6 +22,9 @@
         "foregroundImage": "./assets/images/parkrunicon.png",
         "backgroundColor": "#ffffff"
       },
+      "experimental": {
+      "enableUnifiedPipeline": false
+    },
       "permissions": [
         "android.permission.CAMERA"
       ]
